@@ -1,0 +1,14 @@
+# 바이너리/라이브러리
+bin/
+lib/
+modules/
+build/
+
+# 로그
+logs/
+
+# 런타임
+*.pid
+*.sock
+
+# Tomcat (심볼릭 링크로 관리하거나 별도)

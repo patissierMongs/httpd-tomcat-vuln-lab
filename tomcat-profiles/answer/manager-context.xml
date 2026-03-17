@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ──────────────────────────────────────────────
+     [VULN-12] Manager IP 접근 제한 제거됨
+     ────────────────────────────────────────────── -->
+<Context antiResourceLocking="false" privileged="true" >
+  <CookieProcessor className="org.apache.tomcat.util.http.Rfc6265CookieProcessor"
+                   sameSiteCookies="strict" />
+  <Manager sessionAttributeValueClassNameFilter="java\.lang\.(?:Boolean|Integer|Long|Number|String)|org\.apache\.catalina\.filters\.CsrfPreventionFilter\$LruCache(?:\$1)?|java\.util\.(?:Linked)?HashMap"/>
+
+  <!-- [FIX] RemoteCIDRValve 추가하여 접근 IP 제한:
+       <Valve className="org.apache.catalina.valves.RemoteCIDRValve"
+              allow="127.0.0.0/8,::1/128" />
+       → 로컬에서만 Manager 접근 허용.
+       → 원격 관리가 필요하면 VPN 대역만 allow에 추가.
+       → 예: allow="127.0.0.0/8,::1/128,10.0.0.0/8" -->
+</Context>

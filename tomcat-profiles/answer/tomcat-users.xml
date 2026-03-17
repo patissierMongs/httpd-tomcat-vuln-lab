@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tomcat-users xmlns="http://tomcat.apache.org/xml"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://tomcat.apache.org/xml tomcat-users.xsd"
+              version="1.0">
+
+  <!-- ──────────────────────────────────────────────
+       [VULN-12] 약한 비밀번호 + 모든 역할 부여
+       ────────────────────────────────────────────── -->
+  <role rolename="manager-gui"/>
+  <role rolename="manager-script"/>
+  <role rolename="manager-jmx"/>
+  <role rolename="manager-status"/>
+  <role rolename="admin-gui"/>
+  <role rolename="admin-script"/>
+  <user username="admin" password="admin" roles="manager-gui,manager-script,manager-jmx,manager-status,admin-gui,admin-script"/>
+  <user username="tomcat" password="tomcat" roles="manager-gui,manager-status"/>
+
+  <!-- [FIX] 1) 불필요한 계정 삭제. 필요한 계정만 최소 역할로 생성.
+       2) 비밀번호는 최소 12자 이상, 대소문자+숫자+특수문자 조합.
+       3) manager-script, manager-jmx는 GUI 사용자에게 부여하지 않음.
+       예시:
+       <role rolename="manager-gui"/>
+       <user username="deployer" password="X9#kL2$mP7vQ!wR4" roles="manager-gui"/>
+       → 한 계정에 모든 역할을 몰아주지 않고 역할별 계정 분리. -->
+</tomcat-users>

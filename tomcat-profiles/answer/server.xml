@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ──────────────────────────────────────────────
+     [VULN-15] Shutdown 포트 노출
+     ────────────────────────────────────────────── -->
+<Server port="8005" shutdown="SHUTDOWN">
+<!-- [FIX] <Server port="-1" shutdown="SHUTDOWN">
+     → port="-1"로 설정하면 shutdown 포트가 비활성화되어
+       외부에서 "SHUTDOWN" 문자열을 보내 Tomcat을 종료할 수 없음.
+     → 최소한 shutdown 문자열을 랜덤 값으로 변경:
+       <Server port="8005" shutdown="s3cR3t_rAnD0m_sTr1nG"> -->
+
+  <Listener className="org.apache.catalina.startup.VersionLoggerListener" />
+  <Listener className="org.apache.catalina.core.AprLifecycleListener" />
+  <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener" />
+  <Listener className="org.apache.catalina.mbeans.GlobalResourcesLifecycleListener" />
+  <Listener className="org.apache.catalina.core.ThreadLocalLeakPreventionListener" />
+
+  <GlobalNamingResources>
+    <Resource name="UserDatabase" auth="Container"
+              type="org.apache.catalina.UserDatabase"
+              description="User database that can be updated and saved"
+              factory="org.apache.catalina.users.MemoryUserDatabaseFactory"
+              pathname="conf/tomcat-users.xml" />
+  </GlobalNamingResources>
+
+  <Service name="Catalina">
+
+    <!-- ──────────────────────────────────────────────
+         [VULN-16] 서버 버전/정보 노출 (HTTP Connector)
+         ────────────────────────────────────────────── -->
+    <Connector port="8080" protocol="HTTP/1.1"
+               connectionTimeout="20000"
+               redirectPort="8443"
+               maxParameterCount="1000"
+               server="Apache-Coyote/1.1"
+               xpoweredBy="true" />
+    <!-- [FIX] server="Apache" xpoweredBy="false"
+         → server 속성을 일반적인 값으로 변경하여 Tomcat임을 숨김.
+         → xpoweredBy="false"로 X-Powered-By 헤더 제거. -->
+
+    <!-- ──────────────────────────────────────────────
+         [VULN-14] AJP Connector 무제한 노출 (GhostCat)
+         ────────────────────────────────────────────── -->
+    <Connector protocol="AJP/1.3"
+               address="0.0.0.0"
+               port="8009"
+               redirectPort="8443"
+               maxParameterCount="1000"
+               secretRequired="false"
+               allowedRequestAttributesPattern=".*" />
+    <!-- [FIX] 아래처럼 변경:
+         <Connector protocol="AJP/1.3"
+                    address="127.0.0.1"
+                    port="8009"
+                    redirectPort="8443"
+                    maxParameterCount="1000"
+                    secretRequired="true"
+                    secret="your-strong-secret-here" />
+         → address="127.0.0.1": 로컬에서만 AJP 접근 허용.
+         → secretRequired="true" + secret: Apache mod_jk와 공유 비밀키로 인증.
+           (workers.properties에도 동일한 secret 설정 필요)
+         → allowedRequestAttributesPattern 제거: AJP 내부 속성 조작 차단. -->
+
+    <Engine name="Catalina" defaultHost="localhost">
+
+      <!-- ──────────────────────────────────────────────
+           [VULN-13] 브루트포스 방어 없음 (LockOutRealm 미적용)
+           ────────────────────────────────────────────── -->
+      <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
+             resourceName="UserDatabase"/>
+      <!-- [FIX] LockOutRealm으로 감싸기:
+           <Realm className="org.apache.catalina.realm.LockOutRealm">
+               <Realm className="org.apache.catalina.realm.UserDatabaseRealm"
+                      resourceName="UserDatabase"/>
+           </Realm>
+           → 기본 5회 실패 시 계정 잠금. 브루트포스 공격 방어. -->
+
+      <!-- ──────────────────────────────────────────────
+           [VULN-18] autoDeploy 활성화
+           ────────────────────────────────────────────── -->
+      <Host name="localhost" appBase="webapps"
+            unpackWARs="true" autoDeploy="true">
+      <!-- [FIX] autoDeploy="false"
+           → webapps에 WAR를 넣어도 자동 배포되지 않음.
+             공격자가 파일 쓰기 권한 획득 시 웹쉘 자동 배포 차단. -->
+
+        <!-- ──────────────────────────────────────────────
+             [VULN-16] 에러 리포트에 서버 정보 노출
+             ────────────────────────────────────────────── -->
+        <Valve className="org.apache.catalina.valves.ErrorReportValve"
+               showReport="true"
+               showServerInfo="true" />
+        <!-- [FIX] showReport="false" showServerInfo="false"
+             → 에러 페이지에서 스택 트레이스, Tomcat 버전 정보 숨김. -->
+
+        <Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"
+               prefix="localhost_access_log" suffix=".txt"
+               pattern="%h %l %u %t &quot;%r&quot; %s %b" />
+      </Host>
+    </Engine>
+  </Service>
+</Server>
