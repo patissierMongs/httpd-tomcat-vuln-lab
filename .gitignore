@@ -11,4 +11,7 @@ logs/
 *.pid
 *.sock
 
+# 라이브러리 (큰 바이너리)
+vuln-app/WEB-INF/lib/
+
 # Tomcat (심볼릭 링크로 관리하거나 별도)

@@ -1,6 +1,7 @@
 #!/bin/bash
 # 프로필 전환 스크립트
-# 사용법: ./switch-profile.sh [default|vulnerable]
+# 사용법: ./switch-profile.sh [default|vulnerable|answer]
+# HTTPD_HOME, TOMCAT_HOME을 자신의 환경에 맞게 수정하세요.
 
 HTTPD_HOME="/home/yuyu/httpd-2.4.66"
 TOMCAT_HOME="/home/yuyu/tomcat"

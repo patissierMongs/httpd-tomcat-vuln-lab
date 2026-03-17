@@ -6,7 +6,8 @@
 |------|------|------|
 | Apache httpd 2.4.66 | `/home/yuyu/httpd-2.4.66` | 8881 |
 | Tomcat 9.0.115 | `/home/yuyu/tomcat` | 8080 (HTTP), 8009 (AJP), 8005 (Shutdown) |
-| mod_jk 연동 | `/t1/*`, `/t2/*` → AJP worker1 | |
+| mod_jk 연동 | `/t1/*`, `/t2/*`, `/vuln/*`, `/manager/*` → AJP worker1 | |
+| 취약 웹앱 | `/vuln/` (Tomcat에 배포) | 8080 또는 8881 경유 |
 
 ## 프로필 전환
 
@@ -383,3 +384,156 @@ cp malicious.war /home/yuyu/tomcat/webapps/
 autoDeploy가 켜져 있으면 Tomcat이 webapps 디렉터리를 주기적으로 감시하다가 새 WAR 파일이 나타나면 자동 배포한다. 공격자가 파일 쓰기 권한을 얻으면(VULN-06 Command Injection, 파일 업로드 등) 악성 WAR를 넣어 웹쉘을 자동 배포할 수 있다.
 
 **default와 비교**: `autoDeploy="false"` → 수동 배포만 허용
+
+---
+
+## 애플리케이션 레벨 취약점 (vuln-app)
+
+접근: `http://localhost:8080/vuln/` 또는 `http://localhost:8881/vuln/`
+
+---
+
+### VULN-19. Reflected / Stored XSS
+
+**파일**: `vuln-app/xss.jsp`
+
+**확인 방법**:
+```
+Reflected: http://localhost:8080/vuln/xss.jsp?name=<script>alert('XSS')</script>
+Stored:    댓글에 <img src=x onerror=alert(1)> 입력 후 등록
+```
+
+**왜 취약한가**:
+사용자 입력(`request.getParameter`)을 HTML 이스케이프 없이 `<%=name%>`으로 출력한다. 공격자가 JavaScript를 삽입하면 다른 사용자의 브라우저에서 실행되어 쿠키 탈취, 키로깅, 피싱 페이지 삽입이 가능하다. Stored XSS는 서버에 저장되므로 해당 페이지를 방문하는 모든 사용자가 피해를 입는다. OWASP Top 10 A03:2021 (Injection).
+
+**수정 방법**: JSTL `<c:out>` 또는 `OWASP Java Encoder`의 `Encode.forHtml()` 사용.
+
+---
+
+### VULN-20. SQL Injection
+
+**파일**: `vuln-app/sqli.jsp`
+
+**확인 방법**:
+```
+전체 조회:   http://localhost:8080/vuln/sqli.jsp?name=' OR '1'='1
+패스워드:    http://localhost:8080/vuln/sqli.jsp?name=' UNION SELECT id,name,password,role FROM users--
+```
+
+**왜 취약한가**:
+`"SELECT ... WHERE name = '" + searchName + "'"` 처럼 문자열 연결로 SQL을 조합하면 공격자가 SQL 구문을 주입하여 인증 우회, 전체 데이터 덤프, 데이터 삭제/변조가 가능하다. UNION 공격으로 다른 테이블(비밀번호, 개인정보)도 조회할 수 있다. 에러 메시지에 SQL 쿼리와 스택 트레이스가 노출되어 공격을 더 쉽게 만든다.
+
+**수정 방법**: `PreparedStatement`와 바인드 변수(`?`) 사용. 에러 메시지에 내부 정보 노출 금지.
+
+---
+
+### VULN-21. 파일 업로드 (Unrestricted File Upload)
+
+**파일**: `vuln-app/upload.jsp`
+
+**확인 방법**:
+```
+1) shell.jsp 파일 생성:
+   <% Runtime.getRuntime().exec(request.getParameter("cmd")); %>
+2) upload.jsp에서 업로드
+3) http://localhost:8080/vuln/uploads/shell.jsp?cmd=id 접근
+```
+
+**왜 취약한가**:
+확장자, Content-Type, 매직바이트 검증 없이 웹 접근 가능 경로(`/uploads/`)에 원본 파일명으로 저장한다. JSP/WAR 파일을 업로드하면 Tomcat이 서버사이드 코드로 실행하므로 웹쉘이 된다. 파일명에 `../` 를 포함시키면 경로 조작도 가능하다.
+
+**수정 방법**: 확장자 화이트리스트, 파일명 UUID 랜덤화, 웹 접근 불가 경로에 저장, Content-Type + 매직바이트 이중 검증.
+
+---
+
+### VULN-22. Local File Inclusion (LFI)
+
+**파일**: `vuln-app/lfi.jsp`
+
+**확인 방법**:
+```
+http://localhost:8080/vuln/lfi.jsp?page=/etc/passwd
+http://localhost:8080/vuln/lfi.jsp?page=/home/yuyu/tomcat/conf/tomcat-users.xml
+```
+
+**왜 취약한가**:
+사용자 입력을 `Files.readAllBytes(Paths.get(page))`에 그대로 전달한다. 경로 검증이 없으므로 서버의 모든 파일을 읽을 수 있다. tomcat-users.xml을 읽으면 Manager 비밀번호를 획득하고, SSH 키를 읽으면 서버에 직접 접속할 수 있다.
+
+**수정 방법**: 화이트리스트 매핑, 또는 `Path.toRealPath()` 후 기준 디렉터리 내인지 `startsWith()` 검증.
+
+---
+
+### VULN-23. SSRF (Server-Side Request Forgery)
+
+**파일**: `vuln-app/ssrf.jsp`
+
+**확인 방법**:
+```
+http://localhost:8080/vuln/ssrf.jsp?url=http://localhost:8080/manager/html
+http://localhost:8080/vuln/ssrf.jsp?url=file:///etc/passwd
+http://localhost:8080/vuln/ssrf.jsp?url=http://169.254.169.254/latest/meta-data/
+```
+
+**왜 취약한가**:
+서버가 사용자 지정 URL을 그대로 요청한다. 공격자가 내부망 서비스(DB, Redis, 관리 콘솔), 클라우드 메타데이터(AWS IAM 자격증명), `file://` 프로토콜로 로컬 파일에 접근할 수 있다. 방화벽이 외부→내부를 차단해도 서버가 내부에서 요청하므로 우회된다.
+
+**수정 방법**: URL 화이트리스트, 내부 IP 대역 차단, 프로토콜 제한(http/https만), DNS rebinding 방지.
+
+---
+
+### VULN-24. OS Command Injection (JSP)
+
+**파일**: `vuln-app/cmd.jsp`
+
+**확인 방법**:
+```
+POST cmd=id
+POST cmd=id; cat /etc/passwd
+POST cmd=cat /etc/passwd | grep root
+```
+
+**왜 취약한가**:
+`Runtime.getRuntime().exec(new String[]{"/bin/bash", "-c", cmd})`로 사용자 입력을 쉘에 전달한다. `;`, `|`, `&&` 등 메타문자로 명령을 체이닝할 수 있어 임의 명령 실행(RCE)이 가능하다. 리버스 쉘로 완전한 서버 장악까지 이어진다.
+
+**수정 방법**: 명령 실행 자체를 제거. 불가피하면 ProcessBuilder에 인자를 배열로 전달하여 쉘 해석 방지.
+
+---
+
+### VULN-25. Session Info Leak / Session Fixation
+
+**파일**: `vuln-app/session.jsp`
+
+**확인 방법**:
+```
+http://localhost:8080/vuln/session.jsp
+→ 세션 ID, 생성 시간, 속성이 모두 노출됨
+
+http://localhost:8080/vuln/session.jsp?key=role&value=admin
+→ 세션 속성 임의 조작
+```
+
+**왜 취약한가**:
+세션 ID가 페이지에 노출되어 공격자가 세션 하이재킹에 활용할 수 있다. 세션 속성을 파라미터로 조작할 수 있어 권한 상승이 가능하다. 세션 고정 공격 시 로그인 전후 세션 ID가 변경되지 않으면 공격자의 세션을 피해자가 그대로 사용하게 된다.
+
+**수정 방법**: 세션 정보 페이지 제거 또는 인증 필수. 로그인 시 `request.changeSessionId()`. 쿠키에 HttpOnly/Secure/SameSite.
+
+---
+
+### VULN-26. XXE (XML External Entity)
+
+**파일**: `vuln-app/xxe.jsp`
+
+**확인 방법**:
+```xml
+POST로 아래 XML 전송:
+<?xml version="1.0"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<data>&xxe;</data>
+```
+
+**왜 취약한가**:
+`DocumentBuilderFactory`의 기본 설정은 외부 엔티티를 처리한다. 공격자가 `SYSTEM` 엔티티로 서버의 로컬 파일을 읽거나, HTTP 엔티티로 내부망에 SSRF 요청을 보낼 수 있다. Billion Laughs 공격으로 DoS도 가능하다. OWASP Top 10 A05:2017에서 단독 카테고리였을 정도로 심각한 취약점.
+
+**수정 방법**: `factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)` 등으로 외부 엔티티 비활성화.
