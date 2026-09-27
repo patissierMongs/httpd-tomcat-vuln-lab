@@ -4,8 +4,8 @@
 
 | 항목 | 경로 | 포트 |
 |------|------|------|
-| Apache httpd 2.4.66 | `/home/yuyu/httpd-2.4.66` | 8881 |
-| Tomcat 9.0.115 | `/home/yuyu/tomcat` | 8080 (HTTP), 8009 (AJP), 8005 (Shutdown) |
+| Apache httpd 2.4.66 | `$HTTPD_HOME` | 8881 |
+| Tomcat 9.0.115 | `$TOMCAT_HOME` | 8080 (HTTP), 8009 (AJP), 8005 (Shutdown) |
 | mod_jk 연동 | `/t1/*`, `/t2/*`, `/vuln/*`, `/manager/*` → AJP worker1 | |
 | 취약 웹앱 | `/vuln/` (Tomcat에 배포) | 8080 또는 8881 경유 |
 
@@ -31,13 +31,13 @@ cp tomcat/conf/profiles/vulnerable/manager-context.xml tomcat/webapps/host-manag
 
 ```bash
 # 시작
-/home/yuyu/tomcat/bin/startup.sh && /home/yuyu/httpd-2.4.66/bin/apachectl start
+$TOMCAT_HOME/bin/startup.sh && $HTTPD_HOME/bin/apachectl start
 
 # 중지
-/home/yuyu/httpd-2.4.66/bin/apachectl stop && /home/yuyu/tomcat/bin/shutdown.sh
+$HTTPD_HOME/bin/apachectl stop && $TOMCAT_HOME/bin/shutdown.sh
 
 # Apache만 재시작
-/home/yuyu/httpd-2.4.66/bin/apachectl restart
+$HTTPD_HOME/bin/apachectl restart
 ```
 
 ---
@@ -108,7 +108,7 @@ XSS 취약점과 결합하면 HttpOnly 쿠키를 탈취할 수 있다. HttpOnly 
 **확인 방법**:
 ```bash
 # 심볼릭 링크 생성 후 접근
-ln -s /etc /home/yuyu/httpd-2.4.66/htdocs/etc_link
+ln -s /etc $HTTPD_HOME/htdocs/etc_link
 curl http://localhost:8881/etc_link/passwd
 curl http://localhost:8881/etc_link/shadow
 ```
@@ -221,10 +221,10 @@ AllowOverride All이면 .htaccess 파일로 거의 모든 Apache 설정을 디�
 
 **확인 방법**:
 ```bash
-ln -s /etc/passwd /home/yuyu/httpd-2.4.66/htdocs/passwd_link
+ln -s /etc/passwd $HTTPD_HOME/htdocs/passwd_link
 curl http://localhost:8881/passwd_link
 
-ln -s /home/yuyu/.ssh /home/yuyu/httpd-2.4.66/htdocs/ssh_link
+ln -s $HOME/.ssh $HTTPD_HOME/htdocs/ssh_link
 curl http://localhost:8881/ssh_link/
 ```
 
@@ -376,7 +376,7 @@ examples 앱에는 세션 조작(SessionExample), 요청 헤더 덤프(snoop.jsp
 **확인 방법**:
 ```bash
 # webapps/ 디렉터리에 WAR를 넣으면 자동 배포됨
-cp malicious.war /home/yuyu/tomcat/webapps/
+cp malicious.war $TOMCAT_HOME/webapps/
 # → 수 초 후 자동으로 압축 해제 및 배포
 ```
 
@@ -453,7 +453,7 @@ Stored:    댓글에 <img src=x onerror=alert(1)> 입력 후 등록
 **확인 방법**:
 ```
 http://localhost:8080/vuln/lfi.jsp?page=/etc/passwd
-http://localhost:8080/vuln/lfi.jsp?page=/home/yuyu/tomcat/conf/tomcat-users.xml
+http://localhost:8080/vuln/lfi.jsp?page=$TOMCAT_HOME/conf/tomcat-users.xml
 ```
 
 **왜 취약한가**:

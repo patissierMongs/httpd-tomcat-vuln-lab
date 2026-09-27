@@ -3,8 +3,8 @@
 # 사용법: ./switch-profile.sh [default|vulnerable|answer]
 # HTTPD_HOME, TOMCAT_HOME을 자신의 환경에 맞게 수정하세요.
 
-HTTPD_HOME="/home/yuyu/httpd-2.4.66"
-TOMCAT_HOME="/home/yuyu/tomcat"
+HTTPD_HOME="${HTTPD_HOME:-$HOME/httpd-2.4.66}"
+TOMCAT_HOME="${TOMCAT_HOME:-$HOME/tomcat}"
 PROFILE="$1"
 
 if [ "$PROFILE" != "default" ] && [ "$PROFILE" != "vulnerable" ] && [ "$PROFILE" != "answer" ]; then
@@ -22,6 +22,7 @@ sleep 2
 
 echo "=== $PROFILE 프로필 적용 ==="
 cp "$HTTPD_HOME/conf/profiles/$PROFILE/httpd.conf" "$HTTPD_HOME/conf/httpd.conf"
+sed -i "s|^Define SRVROOT .*|Define SRVROOT \"$HTTPD_HOME\"|" "$HTTPD_HOME/conf/httpd.conf"
 cp "$TOMCAT_HOME/conf/profiles/$PROFILE/server.xml" "$TOMCAT_HOME/conf/server.xml"
 cp "$TOMCAT_HOME/conf/profiles/$PROFILE/tomcat-users.xml" "$TOMCAT_HOME/conf/tomcat-users.xml"
 cp "$TOMCAT_HOME/conf/profiles/$PROFILE/manager-context.xml" "$TOMCAT_HOME/webapps/manager/META-INF/context.xml"
